@@ -1,10 +1,11 @@
-from fastapi.responses import Response
+from decimal import Decimal
+
 from pydantic import BaseModel, Field, field_validator
 
 
 class OperationRequest(BaseModel):
     wallet_name: str = Field(..., max_length=127)
-    amount: float
+    amount: Decimal
     destination: str | None = Field(None, max_length=255)
 
     @field_validator("amount")
