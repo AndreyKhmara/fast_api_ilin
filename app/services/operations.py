@@ -1,41 +1,50 @@
 from fastapi import HTTPException
 
-from app.schemas import OperationRequest, CreateWalletRequest
-
+from app.database import SessionLocal
+from app.schemas import OperationRequest
 import app.repository.wallets as wallets_repository
 
 
 def add_income(operation: OperationRequest):
-    print('operation:', operation)
-    if not wallets_repository.is_wallet_exist(operation.wallet_name):
-        raise HTTPException(status_code=400, detail=f"Wallet {operation.wallet_name} not found")
+    db = SessionLocal()
+    try:
+        if not wallets_repository.is_wallet_exist(db, operation.wallet_name):
+            raise HTTPException(status_code=400, detail=f"Wallet {operation.wallet_name} not found")
 
-    new_balance = wallets_repository.add_income(operation.wallet_name, operation.amount)
-    return {
-        "message": 'Income added successfully',
-        "wallet": operation.wallet_name,
-        "amount": operation.amount,
-        "destination": operation.destination,
-        "new_balance": new_balance
-    }
+        wallet = wallets_repository.add_income(db, operation.wallet_name, operation.amount)
+        db.commit()
+        return {
+            "message": 'Income added successfully',
+            "wallet": operation.wallet_name,
+            "amount": operation.amount,
+            "destination": operation.destination,
+            "new_balance": wallet.balance
+        }
+    finally:
+        db.close()
 
-# TODO остановился на 46:25; продолжить с блока подключение к бд
+
 def add_expense(operation: OperationRequest):
-    if not wallets_repository.is_wallet_exist(operation.wallet_name):
-        raise HTTPException(status_code=400, detail=f"Wallet {operation.wallet_name} not found")
+    db = SessionLocal()
 
-    balance = wallets_repository.get_wallet_balance_by_name(operation.wallet_name)
+    try:
+        if not wallets_repository.is_wallet_exist(db, operation.wallet_name):
+            raise HTTPException(status_code=400, detail=f"Wallet {operation.wallet_name} not found")
 
-    if balance < operation.amount:
-        raise HTTPException(status_code=400,
-                            detail=f"Insufficient funds. Available balance: {balance}")
+        wallet = wallets_repository.get_wallet_balance_by_name(db, operation.wallet_name)
 
-    new_balance = wallets_repository.add_expense(operation.wallet_name, operation.amount)
+        if wallet.balance < operation.amount:
+            raise HTTPException(status_code=400,
+                                detail=f"Insufficient funds. Available balance: {wallet.balance}")
 
-    return {
-        "message": 'expense added successfully',
-        "wallet": operation.wallet_name,
-        "amount": operation.amount,
-        "destination": operation.destination,
-        "new_balance": new_balance
-    }
+        wallet = wallets_repository.add_expense(db, operation.wallet_name, operation.amount)
+        db.commit()
+        return {
+            "message": 'expense added successfully',
+            "wallet": operation.wallet_name,
+            "amount": operation.amount,
+            "destination": operation.destination,
+            "new_balance": wallet.balance
+        }
+    finally:
+        db.close()
